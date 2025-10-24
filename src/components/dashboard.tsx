@@ -691,34 +691,68 @@ export default function Dashboard() {
                                     <h6 className="text-sm font-medium mb-2">📚 Screenshots in this module:</h6>
                                     <div className="space-y-2">
                                       {moduleScreenshots.map((screenshot: Screenshot) => (
-                                        <Card key={screenshot.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                                          <div className="flex">
-                                            <div className="relative w-24 h-24 flex-shrink-0 bg-muted">
-                                              <Image
-                                                src={screenshot.path}
-                                                alt={screenshot.title}
-                                                fill
-                                                className="object-cover"
-                                                unoptimized
-                                              />
+                                        <Card key={screenshot.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => { setSelectedScreenshot(screenshot); setShowScreenshotDialog(true); }}>
+                                          <div className="flex flex-col md:flex-row">
+                                            <div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted">
+                                              <Image src={screenshot.path} alt={screenshot.title} fill className="object-cover" unoptimized />
                                             </div>
-                                            <CardContent className="flex-1 p-3">
-                                              <h6 className="font-medium text-sm line-clamp-1 mb-1">{screenshot.title}</h6>
-                                              <p className="text-xs text-muted-foreground line-clamp-2 mb-1">{screenshot.summary}</p>
-                                              <div className="flex items-center gap-2 text-xs">
-                                                <span className={`px-2 py-0.5 rounded ${
-                                                  screenshot.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
-                                                  screenshot.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' :
-                                                  'bg-yellow-100 text-yellow-700'
-                                                }`}>
-                                                  {screenshot.difficulty}
-                                                </span>
-                                                {screenshot.concepts && screenshot.concepts.length > 0 && (
-                                                  <span className="text-muted-foreground">
-                                                    {screenshot.concepts.slice(0, 2).join(', ')}
-                                                  </span>
-                                                )}
+
+                                            <CardContent className="flex-1 p-4">
+                                              <div className="flex justify-between mb-2">
+                                                <h3 className="font-semibold text-lg">{screenshot.title}</h3>
+                                                <span className={`px-2 py-1 rounded text-xs border ${screenshot.difficulty === 'Beginner' ? 'bg-green-100 text-green-700 border-green-300' : screenshot.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>{screenshot.difficulty}</span>
                                               </div>
+
+                                              <div className="text-xs text-muted-foreground mb-2"><Clock className="h-3 w-3 inline mr-1" />{new Date(screenshot.createdAt).toLocaleString()} • 📁 {screenshot.fileName}</div>
+
+                                              <p className="text-sm text-muted-foreground mb-3">{screenshot.summary}</p>
+
+                                              {screenshot.concepts && screenshot.concepts.length > 0 && (
+                                                <div className="mb-3">
+                                                  <span className="text-xs font-medium">Concepts: </span>
+                                                  <div className="flex flex-wrap gap-1 mt-1">
+                                                    {screenshot.concepts.slice(0,5).map((c, i) => (<span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">🎯 {c}</span>))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {screenshot.keywords && screenshot.keywords.length > 0 && (
+                                                <div className="mb-3">
+                                                  <span className="text-xs font-medium">Keywords: </span>
+                                                  <div className="flex flex-wrap gap-1 mt-1">
+                                                    {screenshot.keywords.slice(0,5).map((k, i) => (<span key={i} className="px-2 py-0.5 bg-secondary text-xs rounded">{k}</span>))}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              <div className="flex flex-wrap gap-2 mt-4">
+                                                <Button size="sm" variant="outline" onClick={() => toggleSection(screenshot.id, 'concepts')}><Brain className="h-4 w-4 mr-1" />Concepts {expandedSections[screenshot.id] === 'concepts' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button>
+                                                <Button size="sm" variant="outline" onClick={() => toggleSection(screenshot.id, 'code')}><Code className="h-4 w-4 mr-1" />Code {expandedSections[screenshot.id] === 'code' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button>
+                                                <Button size="sm" variant="outline" onClick={() => toggleSection(screenshot.id, 'fulltext')}><FileText className="h-4 w-4 mr-1" />Full Text {expandedSections[screenshot.id] === 'fulltext' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button>
+                                                <Button size="sm" variant="outline" onClick={() => reanalyzeMutation.mutate(screenshot.id)} disabled={reanalyzeMutation.isPending}><RefreshCw className={`h-4 w-4 mr-1 ${reanalyzeMutation.isPending ? 'animate-spin' : ''}`} />Reanalyze</Button>
+                                                <Button size="sm" variant="destructive" onClick={() => deleteScreenshotMutation.mutate(screenshot.id)}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+                                              </div>
+
+                                              {expandedSections[screenshot.id] === 'concepts' && screenshot.conceptExplanation && (
+                                                <div className="mt-4 p-4 bg-muted rounded-lg">
+                                                  <h4 className="font-semibold mb-2 flex items-center"><Brain className="h-4 w-4 mr-2" />Concept Explanation</h4>
+                                                  <p className="text-sm mb-3">{screenshot.conceptExplanation}</p>
+                                                  {screenshot.prerequisites && screenshot.prerequisites.length > 0 && (
+                                                    <div className="mb-3"><h5 className="font-medium text-sm mb-1">📚 Prerequisites:</h5><ul className="list-disc list-inside text-sm space-y-1">{screenshot.prerequisites.map((p, i) => (<li key={i}>{p}</li>))}</ul></div>
+                                                  )}
+                                                  {screenshot.nextTopics && screenshot.nextTopics.length > 0 && (
+                                                    <div><h5 className="font-medium text-sm mb-1">➡️ What to Learn Next:</h5><ul className="list-disc list-inside text-sm space-y-1">{screenshot.nextTopics.map((t, i) => (<li key={i}>{t}</li>))}</ul></div>
+                                                  )}
+                                                </div>
+                                              )}
+
+                                              {expandedSections[screenshot.id] === 'code' && screenshot.codeExplanation && (
+                                                <div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Code className="h-4 w-4 mr-2" />Code Explanation</h4><p className="text-sm whitespace-pre-wrap">{screenshot.codeExplanation}</p></div>
+                                              )}
+
+                                              {expandedSections[screenshot.id] === 'fulltext' && screenshot.fullText && (
+                                                <div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" />Extracted Text</h4><pre className="text-sm whitespace-pre-wrap font-mono">{screenshot.fullText}</pre></div>
+                                              )}
                                             </CardContent>
                                           </div>
                                         </Card>
