@@ -1,0 +1,141 @@
+// Prisma schema for SnapNotes Next.js
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  createdAt     DateTime     @default(now())
+  lastLogin     DateTime?
+  
+  screenshots   Screenshot[]
+  folders       Folder[]
+  learningPaths LearningPath[]
+  sessions      Session[]
+  accounts      Account[]
+  
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model Folder {
+  id          String       @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  
+  user        User         @relation(fields: [userId], references: [id])
+  screenshots Screenshot[]
+  learningPaths LearningPath[]
+  
+  @@map("folders")
+}
+
+model Screenshot {
+  id                   String   @id @default(uuid())
+  userId               String
+  folderId             String?
+  fileName             String
+  title                String   @default("Untitled")
+  summary              String?
+  keywords             String?  // JSON array stored as string
+  fullText             String?
+  path                 String
+  createdAt            DateTime @default(now())
+  concepts             String?  // JSON array stored as string
+  conceptExplanation   String?
+  codeExplanation      String?
+  prerequisites        String?  // JSON array stored as string
+  nextTopics           String?  // JSON array stored as string
+  difficulty           String   @default("Intermediate")
+  learningOrder        Int      @default(0)
+  isProcessing         Boolean  @default(false)
+  processingError      String?
+  
+  user                 User     @relation(fields: [userId], references: [id])
+  folder               Folder?  @relation(fields: [folderId], references: [id])
+  
+  @@index([userId, folderId])
+  @@index([userId, createdAt])
+  @@map("screenshots")
+}
+
+model LearningPath {
+  id          String   @id @default(uuid())
+  userId      String
+  folderId    String?
+  name        String
+  pathData    String   // JSON data stored as string
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id])
+  folder      Folder?  @relation(fields: [folderId], references: [id])
+  
+  @@map("learning_paths")
+}
+
+model ProcessingJob {
+  id              String   @id @default(uuid())
+  userId          String
+  status          String   @default("pending") // pending, processing, completed, failed
+  total           Int
+  processed       Int      @default(0)
+  failed          Int      @default(0)
+  results         String?  // JSON array stored as string
+  errors          String?  // JSON array stored as string
+  estimatedTime   String?
+  createdAt       DateTime @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  @@map("processing_jobs")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
