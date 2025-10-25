@@ -48,7 +48,7 @@ cp .env.example .env
 Then edit `.env` with your credentials:
 ```env
 # Database
-DATABASE_URL="file:./snapshoty.db"
+DATABASE_URL_NEON="file:./snapshoty.db"
 
 # NextAuth Configuration
 NEXTAUTH_URL="http://localhost:3000"
@@ -158,7 +158,7 @@ This is a complete Next.js reimplementation of the original FastAPI **Snapshoty 
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DATABASE_URL` | SQLite database path | Yes |
+| `DATABASE_URL_NEON` | SQLite database path | Yes |
 | `NEXTAUTH_URL` | NextAuth callback URL | Yes |
 | `NEXTAUTH_SECRET` | NextAuth encryption secret | Yes |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | Yes |

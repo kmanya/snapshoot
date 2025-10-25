@@ -75,7 +75,7 @@ Add these variables for **Production** environment:
 
 | Variable | Value | Source |
 |----------|-------|--------|
-| `DATABASE_URL` | Your Neon PostgreSQL URL | From `.env` |
+| `DATABASE_URL_NEON` | Your Neon PostgreSQL URL | From `.env` |
 | `NEXTAUTH_URL` | `https://your-app.vercel.app` | Update after first deploy |
 | `NEXTAUTH_SECRET` | Generate new: `openssl rand -base64 32` | New for production |
 | `GOOGLE_CLIENT_ID` | Your Google OAuth Client ID | From `.env` |
@@ -164,7 +164,7 @@ npm run postinstall
 3. Check `NEXTAUTH_SECRET` is set
 
 ### Database Connection Fails
-1. Verify `DATABASE_URL` is correct
+1. Verify `DATABASE_URL_NEON` is correct
 2. Check Neon database is active
 3. Ensure IP allowlist includes Vercel IPs (usually 0.0.0.0/0)
 

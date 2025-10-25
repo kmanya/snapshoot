@@ -40,7 +40,7 @@ npm install
 3. Copy the connection string
 4. Update `.env`:
    ```env
-   DATABASE_URL="postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
+   DATABASE_URL_NEON="postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
    ```
 
 ### 3. Migrate Database (2 minutes)
@@ -68,7 +68,7 @@ git add .
 git commit -m "Production ready: PostgreSQL + Google Drive"
 git push
 ```
-- Update `DATABASE_URL` in Vercel environment variables
+- Update `DATABASE_URL_NEON` in Vercel environment variables
 - Redeploy
 
 ---
@@ -111,7 +111,7 @@ For performance analysis and architecture details:
 ## 🆘 Issues?
 
 Check `SETUP_GUIDE.md` Troubleshooting section or verify:
-- ✅ DATABASE_URL is correct in `.env`
+- ✅ DATABASE_URL_NEON is correct in `.env`
 - ✅ Google Drive API is enabled
 - ✅ `drive.file` scope is added to OAuth
 - ✅ Users signed in with new permissions

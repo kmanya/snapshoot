@@ -73,7 +73,7 @@ lastApiCallTime = Date.now()
 ```prisma
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL_NEON")
 }
 ```
 
@@ -166,7 +166,7 @@ const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 ```bash
 # Replace SQLite with production database
 npm install @prisma/client
-# Update DATABASE_URL in .env to PostgreSQL connection string
+# Update DATABASE_URL_NEON in .env to PostgreSQL connection string
 ```
 
 **Benefits**:

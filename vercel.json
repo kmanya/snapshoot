@@ -3,7 +3,7 @@
   "framework": "nextjs",
   "regions": ["iad1"],
   "env": {
-    "DATABASE_URL": "@database_url",
+    "DATABASE_URL_NEON": "@DATABASE_URL_NEON",
     "NEXTAUTH_URL": "@nextauth_url",
     "NEXTAUTH_SECRET": "@nextauth_secret",
     "GOOGLE_CLIENT_ID": "@google_client_id",

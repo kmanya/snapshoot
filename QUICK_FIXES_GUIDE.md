@@ -14,8 +14,8 @@ This guide provides **copy-paste ready code** for the 3 most critical fixes need
 ### Step 2: Update Environment Variables
 ```env
 # .env
-# Replace your existing DATABASE_URL with PostgreSQL connection string
-DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
+# Replace your existing DATABASE_URL_NEON with PostgreSQL connection string
+DATABASE_URL_NEON="postgresql://user:password@host:5432/database?sslmode=require"
 ```
 
 ### Step 3: Update Prisma Schema
@@ -23,7 +23,7 @@ DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require"
 // prisma/schema.prisma - Change line 8
 datasource db {
   provider = "postgresql"  // Changed from "sqlite"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL_NEON")
 }
 ```
 

@@ -54,7 +54,7 @@ Open your `.env` file and update/add these variables:
 
 ```env
 # DATABASE - Replace your old SQLite URL with Neon PostgreSQL
-DATABASE_URL="postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL_NEON="postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
 
 # Your existing variables (keep these)
 GOOGLE_CLIENT_ID="your-existing-client-id"
@@ -68,7 +68,7 @@ QWEN_API_KEY="your-qwen-key"
 ```
 
 **Important Notes**:
-- Replace the entire `DATABASE_URL` with your Neon connection string
+- Replace the entire `DATABASE_URL_NEON` with your Neon connection string
 - Keep all your existing Google OAuth credentials
 - Google Drive uses the same OAuth credentials (no extra API key needed!)
 
@@ -242,7 +242,7 @@ Now test the performance improvements:
 npx prisma db pull
 
 # If it connects, you'll see your schema
-# If not, check DATABASE_URL in .env
+# If not, check DATABASE_URL_NEON in .env
 ```
 
 ### Issue: TypeScript errors after setup
@@ -273,7 +273,7 @@ git push
    - Go to: https://vercel.com/dashboard
    - Select your project → **Settings** → **Environment Variables**
    - Add:
-     - `DATABASE_URL` = Your Neon connection string
+     - `DATABASE_URL_NEON` = Your Neon connection string
      - Keep all other existing variables
 
 3. **Redeploy**:
@@ -344,7 +344,7 @@ If you encounter any issues:
 - ❌ Forgot to enable Google Drive API
 - ❌ Didn't add `drive.file` scope to OAuth consent
 - ❌ Old session tokens (clear browser data)
-- ❌ Wrong DATABASE_URL format
+- ❌ Wrong DATABASE_URL_NEON format
 
 ---
 
