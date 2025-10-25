@@ -1,6 +1,6 @@
-# 🚀 Vercel Deployment Guide
+# 🚀 Vercel Deployment Guide (GitHub Route)
 
-Complete guide to deploy Snapshoty to production on Vercel.
+Complete guide to deploy Snapshoty to production on Vercel via GitHub.
 
 ---
 
@@ -15,7 +15,7 @@ Complete guide to deploy Snapshoty to production on Vercel.
 
 Go to [Google Cloud Console](https://console.cloud.google.com/):
 
-1. **Add Production URLs**:
+1. **Add Production URLs** (update after deployment):
    - Authorized JavaScript origins: `https://your-app.vercel.app`
    - Authorized redirect URIs: `https://your-app.vercel.app/api/auth/callback/google`
 
@@ -29,80 +29,72 @@ Go to [Google Cloud Console](https://console.cloud.google.com/):
 
 ---
 
-## 🎯 Step-by-Step Deployment
+## 🎯 GitHub → Vercel Deployment (Recommended)
 
-### **Step 1: Install Vercel CLI**
+### **Step 1: Push to GitHub**
 
 ```bash
-npm install -g vercel
+# Initialize git if not already done
+git init
+
+# Add all files
+git add .
+
+# Commit
+git commit -m "Ready for production deployment"
+
+# Create GitHub repo and push
+git remote add origin https://github.com/YOUR_USERNAME/snapshoty.git
+git branch -M main
+git push -u origin main
 ```
 
-### **Step 2: Login to Vercel**
+### **Step 2: Connect to Vercel**
 
+1. Go to [vercel.com](https://vercel.com)
+2. Click **"Add New Project"**
+3. Click **"Import Git Repository"**
+4. Select your GitHub repository: `snapshoty`
+
+### **Step 3: Configure Project**
+
+Vercel will auto-detect Next.js. Verify settings:
+
+- **Framework Preset**: Next.js ✅
+- **Root Directory**: `./`
+- **Build Command**: `npm run build` (auto-detected)
+- **Output Directory**: `.next` (auto-detected)
+
+Click **"Deploy"** (will fail without env vars - that's OK!)
+
+### **Step 4: Add Environment Variables**
+
+In Vercel Dashboard → Your Project → Settings → Environment Variables:
+
+Add these variables for **Production** environment:
+
+| Variable | Value | Source |
+|----------|-------|--------|
+| `DATABASE_URL` | Your Neon PostgreSQL URL | From `.env` |
+| `NEXTAUTH_URL` | `https://your-app.vercel.app` | Update after first deploy |
+| `NEXTAUTH_SECRET` | Generate new: `openssl rand -base64 32` | New for production |
+| `GOOGLE_CLIENT_ID` | Your Google OAuth Client ID | From `.env` |
+| `GOOGLE_CLIENT_SECRET` | Your Google OAuth Client Secret | From `.env` |
+| `QWEN_API_KEY` | Your OpenRouter API Key | From `.env` |
+| `GEMINI_API_KEY` | Your Gemini API Key | From `.env` |
+
+### **Step 5: Redeploy**
+
+After adding environment variables:
+
+1. Go to **Deployments** tab
+2. Click **"..."** on the latest deployment
+3. Click **"Redeploy"**
+
+OR just push a new commit:
 ```bash
-vercel login
-```
-
-### **Step 3: Deploy to Vercel**
-
-```bash
-# From your project directory
-vercel
-```
-
-Follow the prompts:
-- **Set up and deploy?** → Yes
-- **Which scope?** → Your account
-- **Link to existing project?** → No
-- **Project name?** → snapshoty (or your choice)
-- **Directory?** → `./` (current)
-- **Override settings?** → No
-
-### **Step 4: Set Environment Variables**
-
-In your Vercel dashboard or via CLI:
-
-```bash
-# Database
-vercel env add DATABASE_URL
-
-# NextAuth
-vercel env add NEXTAUTH_URL
-vercel env add NEXTAUTH_SECRET
-
-# Google OAuth
-vercel env add GOOGLE_CLIENT_ID
-vercel env add GOOGLE_CLIENT_SECRET
-
-# AI Keys
-vercel env add QWEN_API_KEY
-vercel env add GEMINI_API_KEY
-```
-
-**For each variable**:
-- Choose environment: **Production, Preview, Development** (select all 3)
-- Paste the value from your `.env` file
-
-### **Step 5: Update Environment Variables**
-
-🔴 **CRITICAL**: Update these values for production:
-
-1. **NEXTAUTH_URL**:
-   ```
-   https://your-app.vercel.app
-   ```
-   (Replace with your actual Vercel URL)
-
-2. **NEXTAUTH_SECRET**:
-   Generate a new secret for production:
-   ```bash
-   openssl rand -base64 32
-   ```
-
-### **Step 6: Deploy**
-
-```bash
-vercel --prod
+git commit --allow-empty -m "Trigger deployment"
+git push
 ```
 
 ---
@@ -194,21 +186,26 @@ Or check in Vercel Dashboard → Deployments → [Your Deployment] → Runtime L
 
 ---
 
-## 🔄 Future Deployments
+## 🔄 Future Deployments (Auto-Deploy!)
 
-### Deploy Changes:
+### That's the beauty of GitHub → Vercel:
+
+**Just push to GitHub, Vercel auto-deploys!** 🎉
+
 ```bash
+# Make your changes
 git add .
 git commit -m "Your changes"
 git push origin main
 ```
 
-**Vercel auto-deploys** from GitHub/GitLab if connected!
+Vercel will:
+- ✅ Automatically detect the push
+- ✅ Build your app
+- ✅ Deploy to production
+- ✅ Send you a notification
 
-Or manual deploy:
-```bash
-vercel --prod
-```
+**No manual deployment needed!**
 
 ---
 
