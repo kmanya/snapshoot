@@ -1,0 +1,6 @@
+node_modules/@swc/**
+node_modules/@esbuild/**
+node_modules/@next/swc*/**
+.git/**
+.vercel/**
+.next/cache/**

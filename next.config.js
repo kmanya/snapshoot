@@ -19,18 +19,6 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '50mb',
     },
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@swc/core-linux-x64-gnu',
-        'node_modules/@swc/core-linux-x64-musl',
-        'node_modules/@esbuild/linux-x64',
-        'node_modules/@next/swc-*',
-        '.git',
-      ],
-    },
-    outputFileTracingIncludes: {
-      '/': ['.next/server/**/*'],
-    },
   },
 }
 
