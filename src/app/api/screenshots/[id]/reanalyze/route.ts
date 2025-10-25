@@ -44,7 +44,7 @@ export async function POST(
       : screenshot.path
 
     // Reprocess the screenshot
-    const result = await processScreenshotWithQwenAPI(filePath)
+    const result = await processScreenshotWithQwenAPI(filePath, session.user.id)
 
     // Update the screenshot with new analysis
     const updatedScreenshot = await prisma.screenshot.update({
