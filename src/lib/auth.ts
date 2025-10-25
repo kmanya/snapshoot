@@ -2,6 +2,10 @@ import { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { prisma } from "@/lib/db"
+import { checkEnvironmentVariables } from "@/lib/env-check"
+
+// Validate environment variables at startup
+checkEnvironmentVariables()
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
