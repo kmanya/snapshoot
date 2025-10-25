@@ -15,9 +15,9 @@ export default function SignIn() {
               <Camera className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Welcome to SnapNotes</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to Snapshoty</CardTitle>
           <CardDescription>
-            Your AI-powered screenshot manager for smarter learning
+            Organize Your Screenshots and Make Them Searchable
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -43,9 +43,9 @@ export default function SignIn() {
             <div className="flex items-start space-x-3">
               <Sparkles className="h-5 w-5 text-primary mt-0.5" />
               <div>
-                <p className="font-medium">Powerful Search</p>
+                <p className="font-medium">Instant Search</p>
                 <p className="text-sm text-muted-foreground">
-                  Find any screenshot instantly with semantic search
+                  Find any screenshot instantly with powerful full-text search
                 </p>
               </div>
             </div>

@@ -12,6 +12,14 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           prompt: "select_account",
+          access_type: "offline",
+          response_type: "code",
+          scope: [
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/drive.file", // Access to files created by the app
+          ].join(" "),
         },
       },
     }),
