@@ -153,7 +153,7 @@ export async function uploadToGoogleDrive(
       id: file.data.id!,
       webViewLink: file.data.webViewLink!,
       webContentLink: file.data.webContentLink!,
-      thumbnailLink: file.data.thumbnailLink ?? undefined,
+      thumbnailLink: file.data.thumbnailLink,
     }
   } catch (error: any) {
     console.error('Google Drive upload error:', error)

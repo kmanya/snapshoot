@@ -1,0 +1,32 @@
+# Exclude documentation
+*.md
+!README.md
+
+# Exclude test files
+**/*.test.*
+**/*.spec.*
+
+# Exclude development files
+.env.local
+.env.development
+
+# Exclude large directories
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Exclude git
+.git
+.gitignore
+
+# Exclude IDE files
+.vscode
+.idea
+
+# Exclude logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Exclude database files
+*.db
+*.db-journal
