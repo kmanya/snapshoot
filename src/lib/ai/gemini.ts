@@ -113,7 +113,7 @@ Important:
       
       return learningPath
     } catch (parseError) {
-      console.error('Failed to parse Gemini response:', parseError)
+      console.error('Failed to parse Gemini response :', parseError)
       
       // Return a fallback learning path
       return createFallbackLearningPath(screenshots)
