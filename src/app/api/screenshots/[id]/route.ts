@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import fs from 'fs/promises'
-import path from 'path'
+import { deleteFromGoogleDrive } from '@/lib/google-drive'
 
 // GET /api/screenshots/[id] - Get a specific screenshot
 export async function GET(
@@ -146,24 +145,24 @@ export async function DELETE(
       )
     }
 
+    // Try to delete from Google Drive first
+    if (screenshot.driveFileId) {
+      try {
+        await deleteFromGoogleDrive(session.user.id, screenshot.driveFileId)
+      } catch (error: any) {
+        // Log but continue - file might already be deleted
+        if (error.status === 404 || error.code === 404) {
+          console.log(`⏭️  Drive file already deleted: ${screenshot.driveFileId}`)
+        } else {
+          console.error('⚠️  Error deleting from Drive:', error.message)
+        }
+      }
+    }
+
     // Delete the database entry
     await prisma.screenshot.delete({
       where: { id: params.id }
     })
-
-    // Try to delete the file
-    if (screenshot.path) {
-      try {
-        const filePath = screenshot.path.startsWith('/uploads/') 
-          ? path.join(process.cwd(), 'public', screenshot.path)
-          : screenshot.path
-        
-        await fs.unlink(filePath)
-      } catch (error) {
-        console.error('Error deleting file:', error)
-        // Continue even if file deletion fails
-      }
-    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

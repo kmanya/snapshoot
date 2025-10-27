@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import fs from 'fs/promises'
-import path from 'path'
+import { deleteFromGoogleDrive } from '@/lib/google-drive'
 
 // DELETE /api/clear-all - Clear all user data
 export async function DELETE(req: NextRequest) {
@@ -19,17 +18,20 @@ export async function DELETE(req: NextRequest) {
       where: { userId: session.user.id }
     })
 
-    // Delete files
+    // Delete files from Google Drive
     for (const screenshot of screenshots) {
-      if (screenshot.path) {
+      if (screenshot.driveFileId) {
         try {
-          const filePath = screenshot.path.startsWith('/uploads/')
-            ? path.join(process.cwd(), 'public', screenshot.path)
-            : screenshot.path
-          
-          await fs.unlink(filePath)
-        } catch (error) {
-          console.error(`Error deleting file ${screenshot.path}:`, error)
+          await deleteFromGoogleDrive(session.user.id, screenshot.driveFileId)
+          console.log(`✅ Deleted file from Drive: ${screenshot.driveFileId}`)
+        } catch (error: any) {
+          // Silently ignore 404 errors - file already deleted
+          if (error.status === 404 || error.code === 404) {
+            console.log(`⏭️  File already deleted: ${screenshot.driveFileId}`)
+          } else {
+            console.error(`⚠️  Error deleting file from Drive:`, error.message)
+          }
+          // Continue even if delete fails
         }
       }
     }

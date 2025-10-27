@@ -1,8 +1,14 @@
-# SnapNotes - Next.js Version
+# Snapshoty - Next.js Version
 
 A modern, AI-powered screenshot management application built with Next.js, featuring intelligent content analysis, smart organization, and learning path generation.
 
-## 🚀 Features
+## 🎯 Why Snapshoty?
+
+**The App That Helps You Organize Your Screenshots and Make Them Searchable**
+
+Transform chaotic screenshot collections into an organized, AI-powered knowledge base.
+
+## 🌟 What is Snapshoty?
 
 - **AI-Powered Analysis**: Automatically extract text, concepts, and insights from screenshots using Qwen Vision API
 - **Smart Organization**: Organize screenshots into folders with AI-generated metadata
@@ -24,7 +30,7 @@ A modern, AI-powered screenshot management application built with Next.js, featu
 
 1. **Clone the repository**
 ```bash
-cd snapnotes-nextjs
+cd snapshoty-nextjs
 ```
 
 2. **Install dependencies**
@@ -42,7 +48,7 @@ cp .env.example .env
 Then edit `.env` with your credentials:
 ```env
 # Database
-DATABASE_URL="file:./snapnotes.db"
+DATABASE_URL_NEON="file:./snapshoty.db"
 
 # NextAuth Configuration
 NEXTAUTH_URL="http://localhost:3000"
@@ -106,7 +112,7 @@ npm run start
 ## 🗂️ Project Structure
 
 ```
-snapnotes-nextjs/
+snapshoty-nextjs/
 ├── src/
 │   ├── app/               # Next.js app router pages
 │   │   ├── api/           # API routes
@@ -140,7 +146,7 @@ snapnotes-nextjs/
 
 ## 🔄 Migration from FastAPI
 
-This is a complete Next.js reimplementation of the original FastAPI SnapNotes application with:
+This is a complete Next.js reimplementation of the original FastAPI **Snapshoty solves these problems with:**
 - Same features and functionality
 - Modern React-based frontend
 - Type-safe API routes with TypeScript
@@ -152,7 +158,7 @@ This is a complete Next.js reimplementation of the original FastAPI SnapNotes ap
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `DATABASE_URL` | SQLite database path | Yes |
+| `DATABASE_URL_NEON` | SQLite database path | Yes |
 | `NEXTAUTH_URL` | NextAuth callback URL | Yes |
 | `NEXTAUTH_SECRET` | NextAuth encryption secret | Yes |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | Yes |

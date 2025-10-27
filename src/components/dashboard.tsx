@@ -86,6 +86,9 @@ export default function Dashboard() {
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [learningPathData, setLearningPathData] = useState<any>(null)
   const [generatingPath, setGeneratingPath] = useState(false)
+  const [failedScreenshots, setFailedScreenshots] = useState<any[]>([])
+  const [showFailedDialog, setShowFailedDialog] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
   // Fetch folders
   const { data: foldersData } = useQuery({
@@ -314,17 +317,38 @@ export default function Dashboard() {
           queryClient.invalidateQueries({ queryKey: ['screenshots'] })
           queryClient.invalidateQueries({ queryKey: ['stats'] })
           
-          toast({
-            title: 'Processing complete',
-            description: `Successfully processed ${processed} out of ${total} screenshots.`
-          })
+          // Check if there were any errors
+          const errorList = res.data.errors ? JSON.parse(res.data.errors) : []
+          
+          if (errorList.length > 0) {
+            setFailedScreenshots(errorList)
+            setShowFailedDialog(true)
+            
+            toast({
+              title: 'Partial success',
+              description: `${processed} succeeded, ${errorList.length} failed. Click to retry.`,
+              variant: 'destructive'
+            })
+          } else {
+            toast({
+              title: 'Processing complete',
+              description: `Successfully processed ${processed} out of ${total} screenshots.`
+            })
+          }
         } else if (status === 'failed') {
           clearInterval(interval)
           setUploadProgress(null)
           
+          // Get error details
+          const errorList = res.data.errors ? JSON.parse(res.data.errors) : []
+          if (errorList.length > 0) {
+            setFailedScreenshots(errorList)
+            setShowFailedDialog(true)
+          }
+          
           toast({
             title: 'Processing failed',
-            description: 'Some screenshots could not be processed.',
+            description: 'Some screenshots could not be processed. Click to retry.',
             variant: 'destructive'
           })
         }
@@ -347,15 +371,148 @@ export default function Dashboard() {
     ? screenshotsData?.results || []
     : screenshotsData?.screenshots || []
 
+  // Retry failed screenshots
+  const retryFailedScreenshots = async () => {
+    setRetrying(true)
+    try {
+      const res = await axios.post('/api/screenshots/retry', {
+        failedFiles: failedScreenshots,
+        folder_id: selectedFolder
+      })
+
+      const { job_id } = res.data
+      
+      toast({
+        title: 'Retry started',
+        description: `Retrying ${failedScreenshots.length} screenshot(s)...`
+      })
+
+      setShowFailedDialog(false)
+      setUploadProgress({ jobId: job_id, progress: 10 })
+      
+      // Poll for retry status
+      pollProcessingStatus(job_id)
+    } catch (error) {
+      toast({
+        title: 'Retry failed',
+        description: 'Failed to retry screenshots. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setRetrying(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Processing Overlay - Prevent navigation during upload */}
+      {uploadProgress && uploadProgress.progress < 100 && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+                <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-primary"></div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Processing Your Screenshots</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Please don't close this window, you can navigate away
+                    Reload Page as soon as any % appears
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Progress value={uploadProgress.progress} className="h-3" />
+                  <p className="text-lg font-medium">{uploadProgress.progress}% Complete</p>
+                  <p className="text-xs text-muted-foreground">
+                    Uploading to Google Drive and analyzing with AI...
+                  </p>
+                </div>
+                {uploadProgress.progress > 10 && (
+                  <div className="pt-4 border-t">
+                    <p className="text-xs text-muted-foreground">
+                      ⏱️ This may take a few minutes depending on the number of screenshots
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Failed Screenshots Dialog */}
+      {showFailedDialog && failedScreenshots.length > 0 && (
+        <Dialog open={showFailedDialog} onOpenChange={setShowFailedDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                {failedScreenshots.length} Broken Screenshot{failedScreenshots.length > 1 ? 's' : ''}
+              </DialogTitle>
+              <DialogDescription>
+                These screenshots failed after 3 processing attempts. You can retry them or dismiss.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-3">
+              {failedScreenshots.map((failed, index) => (
+                <Card key={index} className="border-destructive/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm mb-1">{failed.fileName}</h4>
+                        <div className="text-xs space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              failed.errorType === 'JSON_PARSE_ERROR' ? 'bg-orange-100 text-orange-700' :
+                              failed.errorType === 'RATE_LIMIT' ? 'bg-yellow-100 text-yellow-700' :
+                              failed.errorType === 'TIMEOUT' ? 'bg-blue-100 text-blue-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {failed.errorType.replace(/_/g, ' ')}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {new Date(failed.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground mt-2">
+                            {failed.error}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowFailedDialog(false)
+                  setFailedScreenshots([])
+                }}
+                className="w-full sm:w-auto"
+              >
+                Dismiss
+              </Button>
+              <Button
+                onClick={retryFailedScreenshots}
+                disabled={retrying}
+                className="w-full sm:w-auto"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Retrying...' : `Retry ${failedScreenshots.length} Screenshot${failedScreenshots.length > 1 ? 's' : ''}`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      
       {/* Header */}
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Camera className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">SnapNotes</h1>
-          </div>
+        <div className="flex h-16 items-center justify-between px-8">
+          <h1 className="text-2xl font-bold">📸 Snapshoty</h1>
           
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
@@ -566,7 +723,7 @@ export default function Dashboard() {
                         }}>
                           <div className="flex">
                             <div className="relative w-32 h-32 flex-shrink-0 bg-muted">
-                              <Image src={screenshot.path} alt={screenshot.title} fill className="object-cover" unoptimized />
+                              <Image src={`/api/screenshots/${screenshot.id}/image`} alt={screenshot.title} fill className="object-cover" unoptimized />
                             </div>
                             <CardContent className="flex-1 p-3">
                               <h4 className="font-medium text-sm line-clamp-1 mb-1">{screenshot.title}</h4>
@@ -613,7 +770,7 @@ export default function Dashboard() {
                   <div className="space-y-3">
                     {screenshots.map((s: Screenshot) => (
                       <Card key={s.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => { setSelectedScreenshot(s); setShowScreenshotDialog(true); }}>
-                        <div className="flex"><div className="relative w-40 h-32 flex-shrink-0 bg-muted"><Image src={s.path} alt={s.title} fill className="object-cover" unoptimized /></div>
+                        <div className="flex"><div className="relative w-40 h-32 flex-shrink-0 bg-muted"><Image src={`/api/screenshots/${s.id}/image`} alt={s.title} fill className="object-cover" unoptimized /></div>
                         <CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold">{s.title}</h3><span className={`px-2 py-1 rounded text-xs ${s.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' : s.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.difficulty}</span></div><p className="text-sm text-muted-foreground line-clamp-2">{s.summary}</p></CardContent></div>
                       </Card>
                     ))}
@@ -633,7 +790,7 @@ export default function Dashboard() {
                   <Card className="border-destructive"><CardContent className="pt-6"><h3 className="font-semibold text-lg mb-2">⚠️ Delete all data?</h3><p className="text-sm text-muted-foreground mb-4">This cannot be undone!</p><div className="flex gap-2"><Button variant="destructive" onClick={() => clearAllMutation.mutate()}>✅ Yes, Delete All</Button><Button variant="outline" onClick={() => setShowClearConfirm(false)}>❌ Cancel</Button></div></CardContent></Card>
                 )}
                 <div className="flex items-center gap-2"><span className="text-sm font-medium">Sort:</span><Select value={sortOption} onValueChange={setSortOption}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="newest">Newest First</SelectItem><SelectItem value="oldest">Oldest First</SelectItem><SelectItem value="az">Title A-Z</SelectItem><SelectItem value="za">Title Z-A</SelectItem></SelectContent></Select></div>
-                {loadingScreenshots ? (<div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>) : screenshots.length === 0 ? (<Card><CardContent className="py-12 text-center"><Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-sm text-muted-foreground">No screenshots yet.</p></CardContent></Card>) : (<div className="space-y-4">{screenshots.map((s: Screenshot) => (<Card key={s.id} className="overflow-hidden"><div className="flex flex-col md:flex-row"><div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted"><Image src={s.path} alt={s.title} fill className="object-cover" unoptimized /></div><CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold text-lg">{s.title}</h3><span className={`px-2 py-1 rounded text-xs border ${s.difficulty === 'Beginner' ? 'bg-green-100 text-green-700 border-green-300' : s.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>{s.difficulty}</span></div><div className="text-xs text-muted-foreground mb-2"><Clock className="h-3 w-3 inline mr-1" />{new Date(s.createdAt).toLocaleString()} • 📁 {s.fileName}</div><p className="text-sm text-muted-foreground mb-3">{s.summary}</p>{s.concepts && s.concepts.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Concepts: </span><div className="flex flex-wrap gap-1 mt-1">{s.concepts.slice(0,5).map((c, i) => (<span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">🎯 {c}</span>))}</div></div>)}{s.keywords && s.keywords.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Keywords: </span><div className="flex flex-wrap gap-1 mt-1">{s.keywords.slice(0,5).map((k, i) => (<span key={i} className="px-2 py-0.5 bg-secondary text-xs rounded">{k}</span>))}</div></div>)}<div className="flex flex-wrap gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'concepts')}><Brain className="h-4 w-4 mr-1" />Concepts {expandedSections[s.id] === 'concepts' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'code')}><Code className="h-4 w-4 mr-1" />Code {expandedSections[s.id] === 'code' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'fulltext')}><FileText className="h-4 w-4 mr-1" />Full Text {expandedSections[s.id] === 'fulltext' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => reanalyzeMutation.mutate(s.id)} disabled={reanalyzeMutation.isPending}><RefreshCw className={`h-4 w-4 mr-1 ${reanalyzeMutation.isPending ? 'animate-spin' : ''}`} />Reanalyze</Button><Button size="sm" variant="destructive" onClick={() => deleteScreenshotMutation.mutate(s.id)}><Trash2 className="h-4 w-4 mr-1" />Delete</Button></div>{expandedSections[s.id] === 'concepts' && s.conceptExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Brain className="h-4 w-4 mr-2" />Concept Explanation</h4><p className="text-sm mb-3">{s.conceptExplanation}</p>{s.prerequisites && s.prerequisites.length > 0 && (<div className="mb-3"><h5 className="font-medium text-sm mb-1">📚 Prerequisites:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.prerequisites.map((p, i) => (<li key={i}>{p}</li>))}</ul></div>)}{s.nextTopics && s.nextTopics.length > 0 && (<div><h5 className="font-medium text-sm mb-1">➡️ What to Learn Next:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.nextTopics.map((t, i) => (<li key={i}>{t}</li>))}</ul></div>)}</div>)}{expandedSections[s.id] === 'code' && s.codeExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Code className="h-4 w-4 mr-2" />Code Explanation</h4><p className="text-sm whitespace-pre-wrap">{s.codeExplanation}</p></div>)}{expandedSections[s.id] === 'fulltext' && s.fullText && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" />Extracted Text</h4><pre className="text-sm whitespace-pre-wrap font-mono">{s.fullText}</pre></div>)}</CardContent></div></Card>))}</div>)}
+                {loadingScreenshots ? (<div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>) : screenshots.length === 0 ? (<Card><CardContent className="py-12 text-center"><Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-sm text-muted-foreground">No screenshots yet.</p></CardContent></Card>) : (<div className="space-y-4">{screenshots.map((s: Screenshot) => (<Card key={s.id} className="overflow-hidden"><div className="flex flex-col md:flex-row"><div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted"><Image src={`/api/screenshots/${s.id}/image`} alt={s.title} fill className="object-cover" unoptimized /></div><CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold text-lg">{s.title}</h3><span className={`px-2 py-1 rounded text-xs border ${s.difficulty === 'Beginner' ? 'bg-green-100 text-green-700 border-green-300' : s.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>{s.difficulty}</span></div><div className="text-xs text-muted-foreground mb-2"><Clock className="h-3 w-3 inline mr-1" />{new Date(s.createdAt).toLocaleString()} • 📁 {s.fileName}</div><p className="text-sm text-muted-foreground mb-3">{s.summary}</p>{s.concepts && s.concepts.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Concepts: </span><div className="flex flex-wrap gap-1 mt-1">{s.concepts.slice(0,5).map((c, i) => (<span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">🎯 {c}</span>))}</div></div>)}{s.keywords && s.keywords.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Keywords: </span><div className="flex flex-wrap gap-1 mt-1">{s.keywords.slice(0,5).map((k, i) => (<span key={i} className="px-2 py-0.5 bg-secondary text-xs rounded">{k}</span>))}</div></div>)}<div className="flex flex-wrap gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'concepts')}><Brain className="h-4 w-4 mr-1" />Concepts {expandedSections[s.id] === 'concepts' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'code')}><Code className="h-4 w-4 mr-1" />Code {expandedSections[s.id] === 'code' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'fulltext')}><FileText className="h-4 w-4 mr-1" />Full Text {expandedSections[s.id] === 'fulltext' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => reanalyzeMutation.mutate(s.id)} disabled={reanalyzeMutation.isPending}><RefreshCw className={`h-4 w-4 mr-1 ${reanalyzeMutation.isPending ? 'animate-spin' : ''}`} />Reanalyze</Button><Button size="sm" variant="destructive" onClick={() => deleteScreenshotMutation.mutate(s.id)}><Trash2 className="h-4 w-4 mr-1" />Delete</Button></div>{expandedSections[s.id] === 'concepts' && s.conceptExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Brain className="h-4 w-4 mr-2" />Concept Explanation</h4><p className="text-sm mb-3">{s.conceptExplanation}</p>{s.prerequisites && s.prerequisites.length > 0 && (<div className="mb-3"><h5 className="font-medium text-sm mb-1">📚 Prerequisites:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.prerequisites.map((p, i) => (<li key={i}>{p}</li>))}</ul></div>)}{s.nextTopics && s.nextTopics.length > 0 && (<div><h5 className="font-medium text-sm mb-1">➡️ What to Learn Next:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.nextTopics.map((t, i) => (<li key={i}>{t}</li>))}</ul></div>)}</div>)}{expandedSections[s.id] === 'code' && s.codeExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Code className="h-4 w-4 mr-2" />Code Explanation</h4><p className="text-sm whitespace-pre-wrap">{s.codeExplanation}</p></div>)}{expandedSections[s.id] === 'fulltext' && s.fullText && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" />Extracted Text</h4><pre className="text-sm whitespace-pre-wrap font-mono">{s.fullText}</pre></div>)}</CardContent></div></Card>))}</div>)}
               </TabsContent>
 
               {/* Learning Path Tab */}
@@ -949,10 +1106,10 @@ export default function Dashboard() {
                 <DialogTitle>{selectedScreenshot.title}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                {selectedScreenshot.path && (
+                {selectedScreenshot.id && (
                   <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
                     <img
-                      src={selectedScreenshot.path}
+                      src={`/api/screenshots/${selectedScreenshot.id}/image`}
                       alt={selectedScreenshot.title}
                       className="w-full h-full object-contain"
                     />

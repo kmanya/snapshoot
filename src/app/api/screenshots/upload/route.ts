@@ -3,21 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { processScreenshotWithQwenAPI } from '@/lib/ai/qwen-api'
+import { uploadToGoogleDrive } from '@/lib/google-drive'
 import { v4 as uuidv4 } from 'uuid'
-import path from 'path'
-import fs from 'fs/promises'
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-
-// Ensure upload directory exists
-async function ensureUploadDir() {
-  try {
-    await fs.access(UPLOAD_DIR)
-  } catch {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true })
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,8 +23,6 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       )
     }
-
-    await ensureUploadDir()
 
     const formData = await req.formData()
     const files = formData.getAll('files') as File[]
@@ -64,11 +51,12 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    // Upload files and prepare for processing
+    // Upload files to Google Drive
     const fileData: Array<{
       entryId: string
       filename: string
-      path: string
+      driveFileId: string
+      driveUrl: string
     }> = []
     const uploadErrors: Array<{ file: string; error: string }> = []
 
@@ -86,23 +74,27 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // Save file
-        const fileId = uuidv4()
-        const extension = path.extname(file.name)
-        const fileName = `${fileId}${extension}`
-        const filePath = path.join(UPLOAD_DIR, fileName)
-        
+        // Upload to Google Drive
         const buffer = Buffer.from(await file.arrayBuffer())
-        await fs.writeFile(filePath, buffer)
+        const driveResult = await uploadToGoogleDrive(
+          session.user.id,
+          buffer,
+          file.name,
+          file.type
+        )
 
         fileData.push({
           entryId: uuidv4(),
           filename: file.name,
-          path: filePath
+          driveFileId: driveResult.id,
+          driveUrl: driveResult.webContentLink
         })
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error uploading ${file.name}:`, error)
-        uploadErrors.push({ file: file.name, error: 'Upload failed' })
+        uploadErrors.push({ 
+          file: file.name, 
+          error: error.message || 'Upload failed' 
+        })
       }
     }
 
@@ -140,7 +132,7 @@ export async function POST(req: NextRequest) {
 
 async function processScreenshotsInBackground(
   jobId: string,
-  fileData: Array<{ entryId: string; filename: string; path: string }>,
+  fileData: Array<{ entryId: string; filename: string; driveFileId: string; driveUrl: string }>,
   userId: string,
   folderId: string | null
 ) {
@@ -161,8 +153,8 @@ async function processScreenshotsInBackground(
     try {
       console.log(`Processing ${file.filename}...`)
       
-      // Process with AI
-      const aiResult = await processScreenshotWithQwenAPI(file.path)
+      // Process with AI (pass userId for per-user rate limiting)
+      const aiResult = await processScreenshotWithQwenAPI(file.driveUrl, userId)
       
       // Create screenshot entry in database
       const screenshot = await prisma.screenshot.create({
@@ -175,7 +167,8 @@ async function processScreenshotsInBackground(
           summary: aiResult.summary,
           keywords: JSON.stringify(aiResult.keywords),
           fullText: aiResult.full_text,
-          path: `/uploads/${path.basename(file.path)}`, // Store relative path for web access
+          path: file.driveUrl, // Store Google Drive URL
+          driveFileId: file.driveFileId, // Store Drive file ID for easy access
           concepts: JSON.stringify(aiResult.concepts),
           conceptExplanation: aiResult.concept_explanation,
           codeExplanation: aiResult.code_explanation,
@@ -202,16 +195,24 @@ async function processScreenshotsInBackground(
           results: JSON.stringify(results)
         }
       })
-
-      // Rate limiting: wait between requests
-      if (processed < fileData.length) {
-        await new Promise(resolve => setTimeout(resolve, 1500))
-      }
     } catch (error: any) {
-      console.error(`Failed to process ${file.filename}:`, error)
+      console.error(`💔 Failed to process ${file.filename} after 3 attempts:`, error)
+      
+      // Store detailed error information for retry
+      const errorMessage = error.message || 'Unknown error'
+      const errorType = errorMessage.includes('JSON') ? 'JSON_PARSE_ERROR' :
+                        errorMessage.includes('Rate limit') ? 'RATE_LIMIT' :
+                        errorMessage.includes('timeout') ? 'TIMEOUT' :
+                        'PROCESSING_ERROR'
+      
       errors.push({
-        file: file.filename,
-        error: error.message || 'Processing failed'
+        fileName: file.filename,
+        driveFileId: file.driveFileId,
+        driveUrl: file.driveUrl,
+        entryId: file.entryId,
+        error: `Screenshot could not be processed after 3 attempts. ${errorMessage}`,
+        errorType: errorType,
+        timestamp: new Date().toISOString()
       })
 
       // Update job with error
