@@ -35,7 +35,8 @@ import {
   Grid3x3,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Menu
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const [failedScreenshots, setFailedScreenshots] = useState<any[]>([])
   const [showFailedDialog, setShowFailedDialog] = useState(false)
   const [retrying, setRetrying] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   // Fetch folders
   const { data: foldersData } = useQuery({
@@ -583,11 +585,21 @@ export default function Dashboard() {
       
       {/* Header */}
       <header className="border-b">
-        <div className="flex h-16 items-center justify-between px-8">
+        <div className="flex h-16 items-center justify-between px-4 md:px-8">
           <h1 className="text-2xl font-bold">📸 Snapshoty</h1>
           
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            {/* Mobile Menu Button */}
+            <Button
+              variant="ghost" 
+              size="icon"
+              className="md:hidden"
+              onClick={() => setShowMobileMenu(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+
+            <div className="hidden md:flex items-center space-x-2">
               {session?.user?.image && (
                 <Image
                   src={session.user.image}
@@ -602,6 +614,7 @@ export default function Dashboard() {
             <Button 
               variant="outline" 
               size="sm"
+              className="hidden md:flex"
               onClick={() => signOut()}
             >
               <LogOut className="h-4 w-4" />
@@ -609,11 +622,71 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+      
+      {/* Mobile Menu Dialog */}
+      <Dialog open={showMobileMenu} onOpenChange={setShowMobileMenu}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Menu</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              variant={activeTab === 'upload' ? "default" : "outline"} 
+              className="w-full justify-start text-lg h-12"
+              onClick={() => { setActiveTab('upload'); setShowMobileMenu(false); }}
+            >
+              <Upload className="mr-2 h-5 w-5" /> Upload
+            </Button>
+            <Button 
+              variant={activeTab === 'search' ? "default" : "outline"}
+              className="w-full justify-start text-lg h-12"
+              onClick={() => { setActiveTab('search'); setShowMobileMenu(false); }}
+            >
+              <Search className="mr-2 h-5 w-5" /> Search
+            </Button>
+            <Button 
+              variant={activeTab === 'dashboard' ? "default" : "outline"}
+              className="w-full justify-start text-lg h-12"
+              onClick={() => { setActiveTab('dashboard'); setShowMobileMenu(false); }}
+            >
+              <Grid3x3 className="mr-2 h-5 w-5" /> Dashboard
+            </Button>
+            <Button 
+              variant={activeTab === 'learning' ? "default" : "outline"}
+              className="w-full justify-start text-lg h-12"
+              onClick={() => { setActiveTab('learning'); setShowMobileMenu(false); }}
+            >
+              <GraduationCap className="mr-2 h-5 w-5" /> Learning Path
+            </Button>
+            <div className="border-t pt-4 mt-2">
+              <div className="flex items-center gap-2 mb-4">
+                {session?.user?.image && (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name || 'User'}
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                )}
+                <span className="font-medium">{session?.user?.name}</span>
+              </div>
+              <Button 
+                variant="destructive" 
+                className="w-full justify-start"
+                onClick={() => signOut()}
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Sign Out
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           {/* Sidebar */}
-          <div className="col-span-3 space-y-4">
+          <div className="col-span-12 md:col-span-3 space-y-4">
             {/* Stats Card */}
             <Card>
               <CardHeader className="pb-3">
@@ -711,9 +784,9 @@ export default function Dashboard() {
           </div>
 
           {/* Main Content */}
-          <div className="col-span-9">
+          <div className="col-span-12 md:col-span-9">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="hidden md:grid w-full grid-cols-4 h-auto">
                 <TabsTrigger value="upload">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload & Process
