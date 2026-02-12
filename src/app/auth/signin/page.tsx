@@ -1,11 +1,14 @@
 'use client'
 
 import { signIn } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Camera, Brain, FolderOpen, Sparkles } from 'lucide-react'
+import { Camera, Brain, FolderOpen, Sparkles, Eye } from 'lucide-react'
 
 export default function SignIn() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -50,7 +53,7 @@ export default function SignIn() {
               </div>
             </div>
           </div>
-          
+
           <Button
             onClick={() => signIn('google', { callbackUrl: '/' })}
             className="w-full"
@@ -77,6 +80,25 @@ export default function SignIn() {
             Sign in with Google
           </Button>
 
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            size="lg"
+            onClick={() => router.push('/guest')}
+          >
+            <Eye className="h-4 w-4" />
+            Try Without Signing In
+          </Button>
+
           <p className="text-xs text-center text-muted-foreground">
             By signing in, you agree to our terms and privacy policy
           </p>
@@ -85,3 +107,4 @@ export default function SignIn() {
     </div>
   )
 }
+

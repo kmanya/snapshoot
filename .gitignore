@@ -44,3 +44,6 @@ snapnotes.db
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# guest temp uploads
+/tmp/
