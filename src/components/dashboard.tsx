@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
   Camera, 
   Search, 
-  FolderPlus, 
+  FolderPlus,
+  Folder, 
   Upload, 
   LogOut, 
   Download,
@@ -688,41 +689,60 @@ export default function Dashboard() {
       
       {/* Mobile Menu Dialog */}
       <Dialog open={showMobileMenu} onOpenChange={setShowMobileMenu}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] overflow-y-auto max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Menu</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Button 
-              variant={activeTab === 'upload' ? "default" : "outline"} 
-              className="w-full justify-start text-lg h-12"
-              onClick={() => { setActiveTab('upload'); setShowMobileMenu(false); }}
-            >
-              <Upload className="mr-2 h-5 w-5" /> Upload
-            </Button>
-            <Button 
-              variant={activeTab === 'search' ? "default" : "outline"}
-              className="w-full justify-start text-lg h-12"
-              onClick={() => { setActiveTab('search'); setShowMobileMenu(false); }}
-            >
-              <Search className="mr-2 h-5 w-5" /> Search
-            </Button>
-            <Button 
-              variant={activeTab === 'dashboard' ? "default" : "outline"}
-              className="w-full justify-start text-lg h-12"
-              onClick={() => { setActiveTab('dashboard'); setShowMobileMenu(false); }}
-            >
-              <Grid3x3 className="mr-2 h-5 w-5" /> Dashboard
-            </Button>
-            <Button 
-              variant={activeTab === 'learning' ? "default" : "outline"}
-              className="w-full justify-start text-lg h-12"
-              onClick={() => { setActiveTab('learning'); setShowMobileMenu(false); }}
-            >
-              <GraduationCap className="mr-2 h-5 w-5" /> Learning Path
-            </Button>
-            <div className="border-t pt-4 mt-2">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="space-y-4">
+              <h3 className="font-medium">Navigation</h3>
+              <Button 
+                variant={activeTab === 'upload' ? "default" : "outline"} 
+                className="w-full justify-start"
+                onClick={() => { setActiveTab('upload'); setShowMobileMenu(false); }}
+              >
+                <Upload className="mr-2 h-4 w-4" /> Upload
+              </Button>
+              {/* ... other nav ... */}
+            </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium">Folders</h3>
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  onClick={() => { setShowMobileMenu(false); setShowNewFolderDialog(true); }}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                variant={selectedFolder === null ? "secondary" : "ghost"}
+                className="w-full justify-start h-9"
+                onClick={() => { setSelectedFolder(null); setShowMobileMenu(false); }}
+              >
+                <FolderOpen className="h-4 w-4 mr-2" />
+                All Screenshots
+                <span className="ml-auto text-xs text-muted-foreground">{statsData?.total_screenshots || 0}</span>
+              </Button>
+              {folders.map((folder: any) => (
+                <Button
+                  key={folder.id}
+                  variant={selectedFolder === folder.id ? "secondary" : "ghost"}
+                  className="w-full justify-start h-9"
+                  onClick={() => { setSelectedFolder(folder.id); setShowMobileMenu(false); }}
+                >
+                  <Folder className="h-4 w-4 mr-2" />
+                  {folder.name}
+                  <span className="ml-auto text-xs text-muted-foreground">{folder._count?.screenshots || 0}</span>
+                </Button>
+              ))}
+            </div>
+
+            <div className="border-t pt-4">
+               {/* User Profile */}
+               <div className="flex items-center gap-2 mb-4">
                 {session?.user?.image && (
                   <Image
                     src={session.user.image}
@@ -746,10 +766,10 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pb-24 md:pb-6">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Sidebar */}
-          <div className="col-span-12 md:col-span-3 space-y-4">
+          {/* Sidebar - Hidden on Mobile */}
+          <div className="hidden md:block md:col-span-3 space-y-4">
             {/* Stats Card */}
             <Card>
               <CardHeader className="pb-3">
@@ -790,8 +810,9 @@ export default function Dashboard() {
                 >
                   <FolderOpen className="h-4 w-4 mr-2" />
                   All Screenshots
+                  <span className="ml-auto text-xs text-muted-foreground">{statsData?.total_screenshots || 0}</span>
                 </Button>
-                {folders.map((folder: Folder) => (
+                {folders.map((folder: any) => (
                   <Button
                     key={folder.id}
                     variant={selectedFolder === folder.id ? "secondary" : "ghost"}
@@ -910,6 +931,36 @@ export default function Dashboard() {
 
                 {/* Recent Uploads in Upload Tab */}
                 <div>
+                  
+                  {/* Mobile Folder List - Horizontal Scroll */}
+                  <div className="md:hidden mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-sm">📁 Filter by Folder</h3>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowNewFolderDialog(true)}><FolderPlus className="h-4 w-4" /></Button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                      <Button
+                        variant={selectedFolder === null ? "secondary" : "outline"}
+                        size="sm"
+                        className="whitespace-nowrap flex-shrink-0"
+                        onClick={() => setSelectedFolder(null)}
+                      >
+                        All ({statsData?.total_screenshots || 0})
+                      </Button>
+                      {folders.map((folder: any) => (
+                        <Button
+                          key={folder.id}
+                          variant={selectedFolder === folder.id ? "secondary" : "outline"}
+                          size="sm"
+                          className="whitespace-nowrap flex-shrink-0"
+                          onClick={() => setSelectedFolder(folder.id)}
+                        >
+                          {folder.name} ({folder._count?.screenshots || 0})
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
                   <h3 className="text-lg font-semibold mb-3">📚 Recent Uploads</h3>
                   {loadingScreenshots ? (
                     <div className="text-center py-8">
@@ -938,10 +989,6 @@ export default function Dashboard() {
                               <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{screenshot.summary}</p>
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-muted-foreground">{new Date(screenshot.createdAt).toLocaleDateString()}</span>
-                                <span className={`px-2 py-0.5 rounded text-xs ${
-                                  screenshot.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
-                                  screenshot.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                                }`}>{screenshot.difficulty}</span>
                               </div>
                             </CardContent>
                           </div>
@@ -979,7 +1026,7 @@ export default function Dashboard() {
                     {screenshots.map((s: Screenshot) => (
                       <Card key={s.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => { setSelectedScreenshot(s); setShowScreenshotDialog(true); }}>
                         <div className="flex"><div className="relative w-40 h-32 flex-shrink-0 bg-muted"><Image src={`/api/screenshots/${s.id}/image`} alt={s.title} fill className="object-cover" unoptimized /></div>
-                        <CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold">{s.title}</h3><span className={`px-2 py-1 rounded text-xs ${s.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' : s.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.difficulty}</span></div><p className="text-sm text-muted-foreground line-clamp-2">{s.summary}</p></CardContent></div>
+                        <CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold">{s.title}</h3></div><p className="text-sm text-muted-foreground line-clamp-2">{s.summary}</p></CardContent></div>
                       </Card>
                     ))}
                   </div>
@@ -988,7 +1035,37 @@ export default function Dashboard() {
 
               {/* Notes Dashboard Tab */}
               <TabsContent value="dashboard" className="space-y-4">
-                <div><h2 className="text-2xl font-bold mb-2">🧠 Notes Dashboard</h2><p className="text-muted-foreground">View, manage, and export all your processed screenshots.</p></div>
+                <div><h2 className="text-2xl font-bold mb-2">📸 Your Screenshots</h2><p className="text-muted-foreground">View, manage, and export all your processed screenshots.</p></div>
+                
+                {/* Mobile Folder List - Horizontal Scroll */}
+                <div className="md:hidden mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-sm">📁 Folders</h3>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowNewFolderDialog(true)}><FolderPlus className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    <Button
+                      variant={selectedFolder === null ? "secondary" : "outline"}
+                      size="sm"
+                      className="whitespace-nowrap flex-shrink-0"
+                      onClick={() => setSelectedFolder(null)}
+                    >
+                      All ({statsData?.total_screenshots || 0})
+                    </Button>
+                    {folders.map((folder: any) => (
+                      <Button
+                        key={folder.id}
+                        variant={selectedFolder === folder.id ? "secondary" : "outline"}
+                        size="sm"
+                        className="whitespace-nowrap flex-shrink-0"
+                        onClick={() => setSelectedFolder(folder.id)}
+                      >
+                        {folder.name} ({folder._count?.screenshots || 0})
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ['screenshots'] })}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
                   <Button variant="outline" onClick={() => { const params = new URLSearchParams(); if (selectedFolder) params.append('folder_id', selectedFolder); window.open(`/api/export/markdown?${params}`, '_blank'); }}><Download className="h-4 w-4 mr-2" />Export</Button>
@@ -998,7 +1075,7 @@ export default function Dashboard() {
                   <Card className="border-destructive"><CardContent className="pt-6"><h3 className="font-semibold text-lg mb-2">⚠️ Delete all data?</h3><p className="text-sm text-muted-foreground mb-4">This cannot be undone!</p><div className="flex gap-2"><Button variant="destructive" onClick={() => clearAllMutation.mutate()}>✅ Yes, Delete All</Button><Button variant="outline" onClick={() => setShowClearConfirm(false)}>❌ Cancel</Button></div></CardContent></Card>
                 )}
                 <div className="flex items-center gap-2"><span className="text-sm font-medium">Sort:</span><Select value={sortOption} onValueChange={setSortOption}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="newest">Newest First</SelectItem><SelectItem value="oldest">Oldest First</SelectItem><SelectItem value="az">Title A-Z</SelectItem><SelectItem value="za">Title Z-A</SelectItem></SelectContent></Select></div>
-                {loadingScreenshots ? (<div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>) : screenshots.length === 0 ? (<Card><CardContent className="py-12 text-center"><Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-sm text-muted-foreground">No screenshots yet.</p></CardContent></Card>) : (<div className="space-y-4">{screenshots.map((s: Screenshot) => (<Card key={s.id} className="overflow-hidden"><div className="flex flex-col md:flex-row"><div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted"><Image src={`/api/screenshots/${s.id}/image`} alt={s.title} fill className="object-cover" unoptimized /></div><CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold text-lg">{s.title}</h3><span className={`px-2 py-1 rounded text-xs border ${s.difficulty === 'Beginner' ? 'bg-green-100 text-green-700 border-green-300' : s.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-300' : 'bg-yellow-100 text-yellow-700 border-yellow-300'}`}>{s.difficulty}</span></div><div className="text-xs text-muted-foreground mb-2"><Clock className="h-3 w-3 inline mr-1" />{new Date(s.createdAt).toLocaleString()} • 📁 {s.fileName}</div><p className="text-sm text-muted-foreground mb-3">{s.summary}</p>{s.concepts && s.concepts.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Concepts: </span><div className="flex flex-wrap gap-1 mt-1">{s.concepts.slice(0,5).map((c, i) => (<span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">🎯 {c}</span>))}</div></div>)}{s.keywords && s.keywords.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Keywords: </span><div className="flex flex-wrap gap-1 mt-1">{s.keywords.slice(0,5).map((k, i) => (<span key={i} className="px-2 py-0.5 bg-secondary text-xs rounded">{k}</span>))}</div></div>)}<div className="flex flex-wrap gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'concepts')}><Brain className="h-4 w-4 mr-1" />Concepts {expandedSections[s.id] === 'concepts' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'code')}><Code className="h-4 w-4 mr-1" />Code {expandedSections[s.id] === 'code' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'fulltext')}><FileText className="h-4 w-4 mr-1" />Full Text {expandedSections[s.id] === 'fulltext' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => reanalyzeMutation.mutate(s.id)} disabled={reanalyzeMutation.isPending}><RefreshCw className={`h-4 w-4 mr-1 ${reanalyzeMutation.isPending ? 'animate-spin' : ''}`} />Reanalyze</Button><Button size="sm" variant="destructive" onClick={() => deleteScreenshotMutation.mutate(s.id)}><Trash2 className="h-4 w-4 mr-1" />Delete</Button></div>{expandedSections[s.id] === 'concepts' && s.conceptExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Brain className="h-4 w-4 mr-2" />Concept Explanation</h4><p className="text-sm mb-3">{s.conceptExplanation}</p>{s.prerequisites && s.prerequisites.length > 0 && (<div className="mb-3"><h5 className="font-medium text-sm mb-1">📚 Prerequisites:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.prerequisites.map((p, i) => (<li key={i}>{p}</li>))}</ul></div>)}{s.nextTopics && s.nextTopics.length > 0 && (<div><h5 className="font-medium text-sm mb-1">➡️ What to Learn Next:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.nextTopics.map((t, i) => (<li key={i}>{t}</li>))}</ul></div>)}</div>)}{expandedSections[s.id] === 'code' && s.codeExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Code className="h-4 w-4 mr-2" />Code Explanation</h4><p className="text-sm whitespace-pre-wrap">{s.codeExplanation}</p></div>)}{expandedSections[s.id] === 'fulltext' && s.fullText && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" />Extracted Text</h4><pre className="text-sm whitespace-pre-wrap font-mono">{s.fullText}</pre></div>)}</CardContent></div></Card>))}</div>)}
+                {loadingScreenshots ? (<div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>) : screenshots.length === 0 ? (<Card><CardContent className="py-12 text-center"><Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-sm text-muted-foreground">No screenshots yet.</p></CardContent></Card>) : (<div className="space-y-4">{screenshots.map((s: Screenshot) => (<Card key={s.id} className="overflow-hidden"><div className="flex flex-col md:flex-row"><div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted"><Image src={`/api/screenshots/${s.id}/image`} alt={s.title} fill className="object-cover" unoptimized /></div><CardContent className="flex-1 p-4"><div className="flex justify-between mb-2"><h3 className="font-semibold text-lg">{s.title}</h3></div><div className="text-xs text-muted-foreground mb-2"><Clock className="h-3 w-3 inline mr-1" />{new Date(s.createdAt).toLocaleString()} • 📁 {s.fileName}</div><p className="text-sm text-muted-foreground mb-3">{s.summary}</p>{s.concepts && s.concepts.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Concepts: </span><div className="flex flex-wrap gap-1 mt-1">{s.concepts.slice(0,5).map((c, i) => (<span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">🎯 {c}</span>))}</div></div>)}{s.keywords && s.keywords.length > 0 && (<div className="mb-3"><span className="text-xs font-medium">Keywords: </span><div className="flex flex-wrap gap-1 mt-1">{s.keywords.slice(0,5).map((k, i) => (<span key={i} className="px-2 py-0.5 bg-secondary text-xs rounded">{k}</span>))}</div></div>)}<div className="flex flex-wrap gap-2 mt-4"><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'concepts')}><Brain className="h-4 w-4 mr-1" />Concepts {expandedSections[s.id] === 'concepts' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'code')}><Code className="h-4 w-4 mr-1" />Code {expandedSections[s.id] === 'code' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => toggleSection(s.id, 'fulltext')}><FileText className="h-4 w-4 mr-1" />Full Text {expandedSections[s.id] === 'fulltext' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}</Button><Button size="sm" variant="outline" onClick={() => reanalyzeMutation.mutate(s.id)} disabled={reanalyzeMutation.isPending}><RefreshCw className={`h-4 w-4 mr-1 ${reanalyzeMutation.isPending ? 'animate-spin' : ''}`} />Reanalyze</Button><Button size="sm" variant="destructive" onClick={() => deleteScreenshotMutation.mutate(s.id)}><Trash2 className="h-4 w-4 mr-1" />Delete</Button></div>{expandedSections[s.id] === 'concepts' && s.conceptExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Brain className="h-4 w-4 mr-2" />Concept Explanation</h4><p className="text-sm mb-3">{s.conceptExplanation}</p>{s.prerequisites && s.prerequisites.length > 0 && (<div className="mb-3"><h5 className="font-medium text-sm mb-1">📚 Prerequisites:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.prerequisites.map((p, i) => (<li key={i}>{p}</li>))}</ul></div>)}{s.nextTopics && s.nextTopics.length > 0 && (<div><h5 className="font-medium text-sm mb-1">➡️ What to Learn Next:</h5><ul className="list-disc list-inside text-sm space-y-1">{s.nextTopics.map((t, i) => (<li key={i}>{t}</li>))}</ul></div>)}</div>)}{expandedSections[s.id] === 'code' && s.codeExplanation && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><Code className="h-4 w-4 mr-2" />Code Explanation</h4><p className="text-sm whitespace-pre-wrap">{s.codeExplanation}</p></div>)}{expandedSections[s.id] === 'fulltext' && s.fullText && (<div className="mt-4 p-4 bg-muted rounded-lg"><h4 className="font-semibold mb-2 flex items-center"><FileText className="h-4 w-4 mr-2" />Extracted Text</h4><pre className="text-sm whitespace-pre-wrap font-mono">{s.fullText}</pre></div>)}</CardContent></div></Card>))}</div>)}
               </TabsContent>
 
               {/* Learning Path Tab */}
@@ -1372,6 +1449,44 @@ export default function Dashboard() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+        <div className="grid grid-cols-4 h-16">
+          <Button
+            variant="ghost" 
+            className={`flex flex-col items-center justify-center h-full rounded-none ${activeTab === 'upload' ? 'text-primary' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('upload')}
+          >
+            <Upload className="h-5 w-5 mb-1" />
+            <span className="text-[10px]">Upload</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center justify-center h-full rounded-none ${activeTab === 'search' ? 'text-primary' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('search')}
+          >
+            <Search className="h-5 w-5 mb-1" />
+            <span className="text-[10px]">Search</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center justify-center h-full rounded-none ${activeTab === 'dashboard' ? 'text-primary' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            <Grid3x3 className="h-5 w-5 mb-1" />
+            <span className="text-[10px]">Screenshots</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className={`flex flex-col items-center justify-center h-full rounded-none ${activeTab === 'learning' ? 'text-primary' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('learning')}
+          >
+            <GraduationCap className="h-5 w-5 mb-1" />
+            <span className="text-[10px]">Learn</span>
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
