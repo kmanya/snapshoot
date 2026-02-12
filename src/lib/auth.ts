@@ -15,7 +15,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          prompt: "select_account",
+          prompt: "consent",
           access_type: "offline",
           response_type: "code",
           scope: [
@@ -29,6 +29,27 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ account }) {
+      if (account?.provider === 'google') {
+        const requiredScope = 'https://www.googleapis.com/auth/drive.file'
+        const scopes = account.scope?.split(' ') || []
+        
+        // Check if the required scope is present
+        // Google might return scopes as full URLs or short names depending on configuration
+        const hasDriveAccess = scopes.some(scope => 
+          scope === requiredScope || 
+          scope === 'https://www.googleapis.com/auth/drive' ||
+          scope.includes('drive.file')
+        )
+
+        if (!hasDriveAccess) {
+          // Return false to display a default error message 
+          // or return a string to redirect to a custom error page
+          return '/auth/error?error=DrivePermissionsRequired'
+        }
+      }
+      return true
+    },
     async session({ session, token, user }) {
       if (session.user) {
         session.user.id = user.id

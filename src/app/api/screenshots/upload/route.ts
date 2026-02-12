@@ -154,7 +154,9 @@ async function processScreenshotsInBackground(
       console.log(`Processing ${file.filename}...`)
       
       // Process with AI (pass userId for per-user rate limiting)
+      console.log(`Calling Qwen API for ${file.filename}...`)
       const aiResult = await processScreenshotWithQwenAPI(file.driveUrl, userId)
+      console.log(`AI Result received for ${file.filename}`)
       
       // Create screenshot entry in database
       const screenshot = await prisma.screenshot.create({
@@ -178,6 +180,7 @@ async function processScreenshotsInBackground(
           isProcessing: false
         }
       })
+      console.log(`Screenshot created in DB: ${screenshot.id}`)
 
       processed++
       results.push({
@@ -188,6 +191,7 @@ async function processScreenshotsInBackground(
       })
 
       // Update job progress
+      console.log(`Updating job ${jobId} with processed=${processed}`)
       await prisma.processingJob.update({
         where: { id: jobId },
         data: {
@@ -195,6 +199,7 @@ async function processScreenshotsInBackground(
           results: JSON.stringify(results)
         }
       })
+      console.log(`Job updated successfully`)
     } catch (error: any) {
       console.error(`💔 Failed to process ${file.filename} after 3 attempts:`, error)
       

@@ -36,7 +36,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  Menu
+  Menu,
+  Minimize2
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import axios from 'axios'
@@ -341,9 +342,13 @@ export default function Dashboard() {
     }
   }, [selectedFolder, toast])
 
+  const [isBackgroundUploading, setIsBackgroundUploading] = useState(false)
+
   const pollMultipleJobs = async (jobIds: string[], totalFiles: number) => {
     // We'll poll all jobs and aggregate progress
     const jobsStatus = new Map<string, { processed: number, status: string, errors: any[] }>()
+    const startTime = Date.now()
+    const MAX_POLL_TIME = 5 * 60 * 1000 // 5 minutes
     
     // Initialize status
     jobIds.forEach(id => {
@@ -354,6 +359,20 @@ export default function Dashboard() {
       let allCompleted = true
       let totalProcessedCount = 0
       let allErrors: any[] = []
+
+      // Check for global timeout
+      if (Date.now() - startTime > MAX_POLL_TIME) {
+        clearInterval(interval)
+        setUploadProgress(null)
+        setIsBackgroundUploading(false)
+        
+        toast({
+          title: 'Processing Timeout',
+          description: 'The processing took too long. Some files may still be processing in the background.',
+          variant: 'destructive'
+        })
+        return
+      }
 
       // Check each job
       for (const jobId of jobIds) {
@@ -367,9 +386,10 @@ export default function Dashboard() {
         }
 
         try {
-          const res = await axios.get(`/api/processing-status/${jobId}`)
+          const res = await axios.get(`/api/processing-status/${jobId}?t=${Date.now()}`)
           const { status, processed, errors } = res.data
-          const parsedErrors = errors ? JSON.parse(errors) : []
+          // API already returns parsed JSON for errors
+          const parsedErrors = errors || []
           
           jobsStatus.set(jobId, { 
             processed, 
@@ -384,6 +404,7 @@ export default function Dashboard() {
           }
         } catch (error) {
           // Assume transient error, don't mark as completed yet
+          console.error(`Error polling job ${jobId}:`, error)
           allCompleted = false
         }
       }
@@ -391,14 +412,23 @@ export default function Dashboard() {
       // Calculate aggregate progress
       // We start at 10% (uploads done) and scale to 100%
       const processingProgress = Math.round((totalProcessedCount / totalFiles) * 90)
-      setUploadProgress({ 
-        jobId: jobIds[0], // Just use first ID as key
-        progress: 10 + processingProgress 
-      })
+      
+      // Update progress if not complete
+      if (!allCompleted) {
+        setUploadProgress({ 
+          jobId: jobIds[0], // Just use first ID as key
+          progress: 10 + processingProgress 
+        })
+      }
 
       if (allCompleted) {
         clearInterval(interval)
-        setUploadProgress(null)
+        
+        // Force 100% progress
+        setUploadProgress({ 
+          jobId: jobIds[0], 
+          progress: 100 
+        })
         
         // aggregate all errors
         allErrors = []
@@ -406,24 +436,30 @@ export default function Dashboard() {
           allErrors = [...allErrors, ...status.errors]
         })
 
-        queryClient.invalidateQueries({ queryKey: ['screenshots'] })
-        queryClient.invalidateQueries({ queryKey: ['stats'] })
-
-        if (allErrors.length > 0) {
-          setFailedScreenshots(allErrors)
-          setShowFailedDialog(true)
+        // Delay clearing to show 100%
+        setTimeout(() => {
+          setUploadProgress(null)
+          setIsBackgroundUploading(false)
           
-          toast({
-            title: 'Partial success',
-            description: `Processed ${totalProcessedCount} files. ${allErrors.length} failed.`,
-            variant: 'destructive'
-          })
-        } else {
-          toast({
-            title: 'All done!',
-            description: `Successfully processed all ${totalFiles} screenshots.`
-          })
-        }
+          queryClient.invalidateQueries({ queryKey: ['screenshots'] })
+          queryClient.invalidateQueries({ queryKey: ['stats'] })
+
+          if (allErrors.length > 0) {
+            setFailedScreenshots(allErrors)
+            setShowFailedDialog(true)
+            
+            toast({
+              title: 'Partial success',
+              description: `Processed ${totalProcessedCount} files. ${allErrors.length} failed.`,
+              variant: 'destructive'
+            })
+          } else {
+            toast({
+              title: 'All done!',
+              description: `Successfully processed all ${totalFiles} screenshots.`
+            })
+          }
+        }, 1000)
       }
     }, 2000)
   }
@@ -463,6 +499,7 @@ export default function Dashboard() {
 
       setShowFailedDialog(false)
       setUploadProgress({ jobId: job_id, progress: 10 })
+      setIsBackgroundUploading(false)
       
       // Poll for retry status
       pollProcessingStatus(job_id)
@@ -477,21 +514,38 @@ export default function Dashboard() {
     }
   }
 
+  // Protect against accidental navigation
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (uploadProgress && !isBackgroundUploading) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [uploadProgress, isBackgroundUploading])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Processing Overlay - Prevent navigation during upload */}
-      {uploadProgress && uploadProgress.progress < 100 && (
+      {uploadProgress && uploadProgress.progress < 100 && !isBackgroundUploading && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-          <Card className="w-full max-w-md mx-4">
+          <Card className="w-full max-w-md mx-4 border-destructive/50">
             <CardContent className="pt-6">
               <div className="text-center space-y-4">
                 <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-primary"></div>
                 <div>
                   <h3 className="text-xl font-semibold mb-2">Processing Your Screenshots</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Please don't close this window, you can navigate away
-                    Reload Page as soon as any % appears
-                  </p>
+                  <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20 mb-4">
+                    <p className="text-sm font-medium text-destructive">
+                      ⚠️ Do not close this window!
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      You can navigate away, but processing will stop if you close the tab unless you select "Run in Background".
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Progress value={uploadProgress.progress} className="h-3" />
@@ -500,13 +554,22 @@ export default function Dashboard() {
                     Uploading to Google Drive and analyzing with AI...
                   </p>
                 </div>
-                {uploadProgress.progress > 10 && (
-                  <div className="pt-4 border-t">
-                    <p className="text-xs text-muted-foreground">
+                <div className="pt-4 border-t flex flex-col gap-2">
+                  {uploadProgress.progress > 10 && (
+                    <p className="text-xs text-muted-foreground mb-2">
                       ⏱️ This may take a few minutes depending on the number of screenshots
                     </p>
-                  </div>
-                )}
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsBackgroundUploading(true)}
+                    className="w-full"
+                  >
+                    <Minimize2 className="h-4 w-4 mr-2" />
+                    Run in Background
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
