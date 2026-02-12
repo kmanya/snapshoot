@@ -74,20 +74,29 @@ export async function processScreenshotWithQwenAPI(
         base64Image = imageBuffer.toString('base64')
       }
     
-      const prompt = `Analyze this screenshot and provide the following information in JSON format:
+      const prompt = `Analyze this screenshot and provide the following information in strict JSON format.
     
+    IMPORTANT: 
+    - Output must be valid JSON.
+    - Escape ALL double quotes inside string values with backslash (\\").
+    - Escape all backslashes (\\\\).
+    - Do not include markdown formatting or comments.
+    
+    Fields:
     1. title: A concise, descriptive title (max 100 characters)
     2. summary: A comprehensive summary of the content (200-300 words)
-    3. keywords: An array of 5-10 relevant keywords for searching
-    4. full_text: Complete text extraction from the image
-    5. concepts: Array of key concepts or topics (3-7 items)
-    6. concept_explanation: Brief explanation of main concepts (100-200 words)
-    7. code_explanation: If code is present, explain what it does. If not, set to empty string
-    8. prerequisites: Array of prerequisite knowledge needed (2-5 items)
-    9. next_topics: Array of suggested next learning topics (2-5 items)
-    10. difficulty: One of "Beginner", "Intermediate", or "Advanced"
+    3. keywords: An array of 5-10 relevant keywords
+    4. full_text: Complete text extraction. CRITICAL: Escape all double quotes (") as (\\") and backslashes (\\) as (\\\\) within the text.
+    5. concepts: Array of key concepts (3-7 items)
+    6. concept_explanation: Brief explanation (100-200 words)
+    7. code_explanation: If code is present, explain it. Empty string if none.
+    8. prerequisites: Array of prerequisites (2-5 items)
+    9. next_topics: Array of next learning topics (2-5 items)
+    10. difficulty: "Beginner", "Intermediate", or "Advanced"
     
-    Return ONLY valid JSON with these exact keys. No markdown formatting.`
+    Example invalid JSON handling:
+    BAD: "text": "var x = "hello";"
+    GOOD: "text": "var x = \\"hello\\";"`
 
       // Use OpenRouter with a vision-capable model
       const model = process.env.QWEN_MODEL || 'qwen/qwen-2-vl-7b-instruct'
@@ -113,7 +122,7 @@ export async function processScreenshotWithQwenAPI(
               ]
             }
           ],
-          temperature: 0.3,
+          temperature: 0.1,
           max_tokens: 2000
         },
         {
@@ -135,14 +144,14 @@ export async function processScreenshotWithQwenAPI(
       }
 
       // Preprocess content to fix common JSON issues
-      let preprocessedContent = content
+      let preprocessedContent = content.replace(/```json\n?|\n?```/g, '').trim()
       
       // First, find and extract just the JSON object
-      const firstBrace = content.indexOf('{')
-      const lastBrace = content.lastIndexOf('}')
+      const firstBrace = preprocessedContent.indexOf('{')
+      const lastBrace = preprocessedContent.lastIndexOf('}')
       
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        preprocessedContent = content.substring(firstBrace, lastBrace + 1)
+        preprocessedContent = preprocessedContent.substring(firstBrace, lastBrace + 1)
       }
       
       // Try multiple JSON extraction strategies with improved robustness

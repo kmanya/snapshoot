@@ -263,36 +263,73 @@ export default function Dashboard() {
   }
 
   // File upload handler
+  // File upload handler
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return
 
-    const formData = new FormData()
-    acceptedFiles.forEach(file => {
-      formData.append('files', file)
-    })
-    if (selectedFolder) {
-      formData.append('folder_id', selectedFolder)
+    // Chunk files into batches of 5 to prevent timeouts
+    const BATCH_SIZE = 5
+    const chunks = []
+    for (let i = 0; i < acceptedFiles.length; i += BATCH_SIZE) {
+      chunks.push(acceptedFiles.slice(i, i + BATCH_SIZE))
     }
 
+    const totalFiles = acceptedFiles.length
+    const jobIds: string[] = []
+    
+    // Initial progress
+    setUploadProgress({ progress: 1 })
+    
     try {
-      setUploadProgress({ progress: 0 })
-      
-      const res = await axios.post('/api/screenshots/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-
-      const { job_id, message } = res.data
-      
       toast({
         title: 'Upload started',
-        description: message
+        description: `Uploading ${totalFiles} files in ${chunks.length} batches...`
       })
 
-      setUploadProgress({ jobId: job_id, progress: 10 })
-      
-      // Poll for processing status
-      pollProcessingStatus(job_id)
+      // Process chunks sequentially
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]
+        const formData = new FormData()
+        chunk.forEach(file => {
+          formData.append('files', file)
+        })
+        if (selectedFolder) {
+          formData.append('folder_id', selectedFolder)
+        }
+
+        try {
+          // Upload batch
+          const res = await axios.post('/api/screenshots/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          })
+
+          const { job_id } = res.data
+          jobIds.push(job_id)
+          
+          // Update progress based on upload completion
+          // Distribute 10% of total progress across uploads
+          const uploadProgress = Math.min(10, Math.round(((i + 1) / chunks.length) * 10))
+          setUploadProgress({ jobId: job_id, progress: uploadProgress })
+
+        } catch (error) {
+          console.error(`Error uploading batch ${i + 1}:`, error)
+          toast({
+            title: 'Batch upload failed',
+            description: `Failed to upload batch ${i + 1} of ${chunks.length}. Continuing with others...`,
+            variant: 'destructive'
+          })
+        }
+      }
+
+      if (jobIds.length === 0) {
+        throw new Error('All uploads failed')
+      }
+
+      // Poll for all jobs
+      pollMultipleJobs(jobIds, totalFiles)
+
     } catch (error) {
+      console.error('Upload error:', error)
       toast({
         title: 'Upload failed',
         description: 'Failed to upload screenshots. Please try again.',
@@ -302,61 +339,96 @@ export default function Dashboard() {
     }
   }, [selectedFolder, toast])
 
-  const pollProcessingStatus = async (jobId: string) => {
+  const pollMultipleJobs = async (jobIds: string[], totalFiles: number) => {
+    // We'll poll all jobs and aggregate progress
+    const jobsStatus = new Map<string, { processed: number, status: string, errors: any[] }>()
+    
+    // Initialize status
+    jobIds.forEach(id => {
+      jobsStatus.set(id, { processed: 0, status: 'processing', errors: [] })
+    })
+
     const interval = setInterval(async () => {
-      try {
-        const res = await axios.get(`/api/processing-status/${jobId}`)
-        const { status, processed, total } = res.data
+      let allCompleted = true
+      let totalProcessedCount = 0
+      let allErrors: any[] = []
+
+      // Check each job
+      for (const jobId of jobIds) {
+        const currentStatus = jobsStatus.get(jobId)
         
-        const progress = Math.round((processed / total) * 100)
-        setUploadProgress({ jobId, progress })
-        
-        if (status === 'completed') {
-          clearInterval(interval)
-          setUploadProgress(null)
-          queryClient.invalidateQueries({ queryKey: ['screenshots'] })
-          queryClient.invalidateQueries({ queryKey: ['stats'] })
-          
-          // Check if there were any errors
-          const errorList = res.data.errors ? JSON.parse(res.data.errors) : []
-          
-          if (errorList.length > 0) {
-            setFailedScreenshots(errorList)
-            setShowFailedDialog(true)
-            
-            toast({
-              title: 'Partial success',
-              description: `${processed} succeeded, ${errorList.length} failed. Click to retry.`,
-              variant: 'destructive'
-            })
-          } else {
-            toast({
-              title: 'Processing complete',
-              description: `Successfully processed ${processed} out of ${total} screenshots.`
-            })
-          }
-        } else if (status === 'failed') {
-          clearInterval(interval)
-          setUploadProgress(null)
-          
-          // Get error details
-          const errorList = res.data.errors ? JSON.parse(res.data.errors) : []
-          if (errorList.length > 0) {
-            setFailedScreenshots(errorList)
-            setShowFailedDialog(true)
-          }
-          
-          toast({
-            title: 'Processing failed',
-            description: 'Some screenshots could not be processed. Click to retry.',
-            variant: 'destructive'
-          })
+        // Skip completed/failed jobs if we already have their final state
+        if (currentStatus?.status === 'completed' || currentStatus?.status === 'failed') {
+          totalProcessedCount += currentStatus.processed
+          if (currentStatus.errors) allErrors = [...allErrors, ...currentStatus.errors]
+          continue
         }
-      } catch (error) {
+
+        try {
+          const res = await axios.get(`/api/processing-status/${jobId}`)
+          const { status, processed, errors } = res.data
+          const parsedErrors = errors ? JSON.parse(errors) : []
+          
+          jobsStatus.set(jobId, { 
+            processed, 
+            status, 
+            errors: parsedErrors 
+          })
+
+          totalProcessedCount += processed
+          
+          if (status !== 'completed' && status !== 'failed') {
+            allCompleted = false
+          }
+        } catch (error) {
+          // Assume transient error, don't mark as completed yet
+          allCompleted = false
+        }
+      }
+      
+      // Calculate aggregate progress
+      // We start at 10% (uploads done) and scale to 100%
+      const processingProgress = Math.round((totalProcessedCount / totalFiles) * 90)
+      setUploadProgress({ 
+        jobId: jobIds[0], // Just use first ID as key
+        progress: 10 + processingProgress 
+      })
+
+      if (allCompleted) {
         clearInterval(interval)
         setUploadProgress(null)
+        
+        // aggregate all errors
+        allErrors = []
+        jobsStatus.forEach(status => {
+          allErrors = [...allErrors, ...status.errors]
+        })
+
+        queryClient.invalidateQueries({ queryKey: ['screenshots'] })
+        queryClient.invalidateQueries({ queryKey: ['stats'] })
+
+        if (allErrors.length > 0) {
+          setFailedScreenshots(allErrors)
+          setShowFailedDialog(true)
+          
+          toast({
+            title: 'Partial success',
+            description: `Processed ${totalProcessedCount} files. ${allErrors.length} failed.`,
+            variant: 'destructive'
+          })
+        } else {
+          toast({
+            title: 'All done!',
+            description: `Successfully processed all ${totalFiles} screenshots.`
+          })
+        }
       }
     }, 2000)
+  }
+
+  // Simplified poll function for retry/single uploads
+  const pollProcessingStatus = async (jobId: string) => {
+    pollMultipleJobs([jobId], 1) // Treat as single job batch (assumes totalFiles unknown or 1, but processed count will give progress)
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -851,7 +923,7 @@ export default function Dashboard() {
                                         <Card key={screenshot.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => { setSelectedScreenshot(screenshot); setShowScreenshotDialog(true); }}>
                                           <div className="flex flex-col md:flex-row">
                                             <div className="relative w-full md:w-48 h-48 flex-shrink-0 bg-muted">
-                                              <Image src={screenshot.path} alt={screenshot.title} fill className="object-cover" unoptimized />
+                                              <Image src={`/api/screenshots/${screenshot.id}/image`} alt={screenshot.title} fill className="object-cover" unoptimized />
                                             </div>
 
                                             <CardContent className="flex-1 p-4">
