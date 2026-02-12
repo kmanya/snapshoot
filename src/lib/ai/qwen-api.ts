@@ -28,11 +28,11 @@ async function sleep(ms: number): Promise<void> {
 async function waitForUserRateLimit(userId: string): Promise<void> {
   const lastCallTime = userRateLimiters.get(userId) || 0
   const timeSinceLastCall = Date.now() - lastCallTime
-  
+
   if (timeSinceLastCall < MIN_API_INTERVAL) {
     await sleep(MIN_API_INTERVAL - timeSinceLastCall)
   }
-  
+
   userRateLimiters.set(userId, Date.now())
 }
 
@@ -42,7 +42,7 @@ export async function processScreenshotWithQwenAPI(
   maxRetries: number = 3
 ): Promise<QwenResponse> {
   const apiKey = process.env.QWEN_API_KEY
-  
+
   if (!apiKey) {
     throw new Error('QWEN_API_KEY is not configured')
   }
@@ -56,14 +56,14 @@ export async function processScreenshotWithQwenAPI(
       await waitForUserRateLimit(userId)
 
       console.log(`📸 Processing screenshot for user ${userId} (attempt ${retryCount + 1}/${maxRetries})...`)
-      
+
       // Read image from URL or file path and convert to base64
       let base64Image: string
-      
+
       if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
         // Download from URL (Google Drive, etc.)
         const axios = require('axios')
-        const response = await axios.get(imageSource, { 
+        const response = await axios.get(imageSource, {
           responseType: 'arraybuffer',
           timeout: 30000 // 30 second timeout for download
         })
@@ -73,7 +73,7 @@ export async function processScreenshotWithQwenAPI(
         const imageBuffer = await fs.readFile(imageSource)
         base64Image = imageBuffer.toString('base64')
       }
-    
+
       const prompt = `Analyze this screenshot and provide the following information in strict JSON format.
     
     IMPORTANT: 
@@ -100,7 +100,7 @@ export async function processScreenshotWithQwenAPI(
 
       // Use OpenRouter with a vision-capable model
       const model = process.env.QWEN_MODEL || 'qwen/qwen-2-vl-7b-instruct'
-      
+
       const response = await axios.post(
         QWEN_API_URL,
         {
@@ -116,7 +116,7 @@ export async function processScreenshotWithQwenAPI(
                 {
                   type: 'image_url',
                   image_url: {
-                    url: `data:image/jpeg;base64,${base64Image}` 
+                    url: `data:image/jpeg;base64,${base64Image}`
                   }
                 }
               ]
@@ -137,29 +137,35 @@ export async function processScreenshotWithQwenAPI(
       )
 
       // Parse the OpenRouter response (OpenAI-compatible format)
+      if (!response.data || !response.data.choices || !response.data.choices[0]) {
+        console.error('❌ Invalid Qwen API response:', JSON.stringify(response.data, null, 2))
+        const errorMsg = response.data?.error?.message || 'Invalid response structure from AI provider'
+        throw new Error(errorMsg)
+      }
+
       const content = response.data.choices[0].message.content
-      
+
       if (!content) {
-        throw new Error('Invalid response from OpenRouter API')
+        throw new Error('Empty content from OpenRouter API')
       }
 
       // Preprocess content to fix common JSON issues
       let preprocessedContent = content.replace(/```json\n?|\n?```/g, '').trim()
-      
+
       // First, find and extract just the JSON object
       const firstBrace = preprocessedContent.indexOf('{')
       const lastBrace = preprocessedContent.lastIndexOf('}')
-      
+
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         preprocessedContent = preprocessedContent.substring(firstBrace, lastBrace + 1)
       }
-      
+
       // Try multiple JSON extraction strategies with improved robustness
       let result: QwenResponse
-      
+
       // Log first 500 chars for debugging
       console.log('AI Response preview:', preprocessedContent.substring(0, 500))
-      
+
       try {
         // Strategy 1: Try direct parse on preprocessed content
         result = JSON.parse(preprocessedContent) as QwenResponse
@@ -179,30 +185,30 @@ export async function processScreenshotWithQwenAPI(
             // Strategy 3: Find first complete JSON object using brace counting
             const jsonStart = preprocessedContent.indexOf('{')
             if (jsonStart === -1) throw new Error('No opening brace found')
-            
+
             let braceCount = 0
             let inString = false
             let escapeNext = false
             let jsonEnd = -1
-            
+
             for (let i = jsonStart; i < preprocessedContent.length; i++) {
               const char = preprocessedContent[i]
-              
+
               if (escapeNext) {
                 escapeNext = false
                 continue
               }
-              
+
               if (char === '\\') {
                 escapeNext = true
                 continue
               }
-              
+
               if (char === '"' && !escapeNext) {
                 inString = !inString
                 continue
               }
-              
+
               if (!inString) {
                 if (char === '{') braceCount++
                 if (char === '}') {
@@ -214,7 +220,7 @@ export async function processScreenshotWithQwenAPI(
                 }
               }
             }
-            
+
             if (jsonEnd !== -1) {
               const jsonStr = preprocessedContent.substring(jsonStart, jsonEnd + 1)
               result = JSON.parse(jsonStr) as QwenResponse
@@ -229,18 +235,18 @@ export async function processScreenshotWithQwenAPI(
                 .replace(/```json\n?/g, '')
                 .replace(/```\n?/g, '')
                 .trim()
-              
+
               // Find the JSON object
               const start = fixedContent.indexOf('{')
               const end = fixedContent.lastIndexOf('}')
-              
+
               if (start !== -1 && end !== -1) {
                 fixedContent = fixedContent.substring(start, end + 1)
               }
-              
+
               // Remove trailing commas before closing braces/brackets
               fixedContent = fixedContent.replace(/,(\s*[}\]])/g, '$1')
-              
+
               result = JSON.parse(fixedContent) as QwenResponse
               console.log('✅ Strategy 4 (error fixing) succeeded')
             } catch (e4) {
@@ -255,7 +261,7 @@ export async function processScreenshotWithQwenAPI(
           }
         }
       }
-      
+
       // Validate and sanitize the response
       return {
         title: result.title || 'Untitled',
@@ -267,41 +273,41 @@ export async function processScreenshotWithQwenAPI(
         code_explanation: result.code_explanation || '',
         prerequisites: Array.isArray(result.prerequisites) ? result.prerequisites : [],
         next_topics: Array.isArray(result.next_topics) ? result.next_topics : [],
-        difficulty: ['Beginner', 'Intermediate', 'Advanced'].includes(result.difficulty) 
-          ? result.difficulty 
+        difficulty: ['Beginner', 'Intermediate', 'Advanced'].includes(result.difficulty)
+          ? result.difficulty
           : 'Intermediate'
       }
     } catch (error: any) {
       lastError = error
       const status = error.response?.status
-      
+
       // Check if it's a JSON parse error
       if (error.message?.includes('JSON') || error.message?.includes('parse')) {
         const waitTime = 5000 + (retryCount * 5000) // 5, 10, 15 seconds
-        console.log(`⚠️ JSON parse error. Waiting ${waitTime/1000} seconds before retry...`)
+        console.log(`⚠️ JSON parse error. Waiting ${waitTime / 1000} seconds before retry...`)
         await sleep(waitTime)
         retryCount++
         continue
       }
-      
+
       // Check if it's a rate limit error (429)
       if (status === 429) {
         const waitTime = 20000 + (retryCount * 10000) // 20, 30, 40 seconds
-        console.log(`⏳ Rate limited. Waiting ${waitTime/1000} seconds before retry...`)
+        console.log(`⏳ Rate limited. Waiting ${waitTime / 1000} seconds before retry...`)
         await sleep(waitTime)
         retryCount++
         continue
       }
-      
+
       // Network or other errors - retry after brief wait
       if (retryCount < maxRetries - 1) {
         const waitTime = 10000 + (retryCount * 20000) // 3, 5, 7 seconds
-        console.log(`⚠️ Error occurred. Waiting ${waitTime/1000} seconds before retry...`)
+        console.log(`⚠️ Error occurred. Waiting ${waitTime / 1000} seconds before retry...`)
         await sleep(waitTime)
         retryCount++
         continue
       }
-      
+
       // Max retries reached
       break
     }
@@ -323,23 +329,23 @@ export async function processMultipleScreenshots(
 ): Promise<QwenResponse[]> {
   const results: QwenResponse[] = []
   const delayBetweenRequests = 1500 // 1.5 seconds between requests
-  
+
   for (let i = 0; i < imagePaths.length; i++) {
     try {
       const result = await processScreenshotWithQwenAPI(imagePaths[i], userId)
       results.push(result)
-      
+
       if (onProgress) {
         onProgress(i + 1, imagePaths.length)
       }
-      
+
       // Rate limiting: wait before next request (except for the last one)
       if (i < imagePaths.length - 1) {
         await new Promise(resolve => setTimeout(resolve, delayBetweenRequests))
       }
     } catch (error) {
       console.error(`Failed to process ${imagePaths[i]}:`, error)
-      
+
       // Add a placeholder result for failed processing
       results.push({
         title: `Failed to process: ${imagePaths[i].split('/').pop()}`,
@@ -355,6 +361,6 @@ export async function processMultipleScreenshots(
       })
     }
   }
-  
+
   return results
 }
